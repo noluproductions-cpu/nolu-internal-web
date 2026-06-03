@@ -82,8 +82,23 @@ function registerServiceWorker() {
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('sw.js')
-                .then(reg => console.log('Service Worker zaregistrován úspěšně.', reg.scope))
+                .then(reg => {
+                    console.log('Service Worker zaregistrován úspěšně.', reg.scope);
+                    // Kontrola aktualizací kódu na pozadí každých 15 minut
+                    setInterval(() => {
+                        reg.update();
+                    }, 15 * 60 * 1000);
+                })
                 .catch(err => console.error('Chyba registrace Service Workera:', err));
+        });
+
+        // Automatický restart stránky při detekci nové verze na pozadí
+        let refreshing = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (!refreshing) {
+                refreshing = true;
+                window.location.reload();
+            }
         });
     }
 }
