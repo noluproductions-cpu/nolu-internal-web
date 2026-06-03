@@ -60,6 +60,23 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
+// Pomocná funkce pro bezpečné parsování datumů napříč všemi prohlížeči (včetně Safari)
+function safeParseDate(dateStr) {
+    if (!dateStr) return new Date();
+    if (dateStr instanceof Date) return dateStr;
+    
+    let cleanStr = dateStr.toString().replace('T', ' ').replace(/-/g, '/');
+    if (cleanStr.includes(':') && cleanStr.split(':').length === 2) {
+        cleanStr += ':00';
+    }
+    
+    const d = new Date(cleanStr);
+    if (!isNaN(d.getTime())) {
+        return d;
+    }
+    return new Date(dateStr);
+}
+
 // Service Worker Registration
 function registerServiceWorker() {
     if ('serviceWorker' in navigator) {
@@ -558,9 +575,16 @@ function renderDashboard() {
     
     // Render Agenda / Events
     const agendaEl = document.getElementById('dash-agenda');
+    
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    
     const upcomingEvents = state.events
-        .filter(ev => new Date(ev.date) >= new Date())
-        .sort((a, b) => new Date(a.date) - new Date(b.date));
+        .filter(ev => {
+            const evDate = safeParseDate(ev.date);
+            return evDate >= todayStart;
+        })
+        .sort((a, b) => safeParseDate(a.date) - safeParseDate(b.date));
         
     if (upcomingEvents.length === 0) {
         agendaEl.innerHTML = `
@@ -569,7 +593,7 @@ function renderDashboard() {
             </div>`;
     } else {
         agendaEl.innerHTML = upcomingEvents.slice(0, 3).map(ev => {
-            const dateObj = new Date(ev.date);
+            const dateObj = safeParseDate(ev.date);
             const formattedDate = dateObj.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long' });
             const formattedTime = dateObj.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
             
@@ -812,7 +836,7 @@ function renderFinances() {
     
     // 3. Render Ledger List
     const ledgerEl = document.getElementById('ledger-list-container');
-    let filtered = state.transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
+    let filtered = state.transactions.sort((a, b) => safeParseDate(b.date) - safeParseDate(a.date));
     
     if (currentTxFilter === 1) {
         filtered = filtered.filter(t => t.type === 'income');
@@ -827,7 +851,7 @@ function renderFinances() {
             </div>`;
     } else {
         ledgerEl.innerHTML = filtered.map(tx => {
-            const formattedDate = new Date(tx.date).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' });
+            const formattedDate = safeParseDate(tx.date).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' });
             return `
                 <div class="ledger-item">
                     <div class="ledger-info">
@@ -1229,7 +1253,7 @@ function viewProjectDetail(id) {
 
 function renderProjectDetailBody(proj) {
     const container = document.getElementById('detail-project-body');
-    const deadlineDate = new Date(proj.deadline).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' });
+    const deadlineDate = safeParseDate(proj.deadline).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' });
     
     // Checklist HTML
     let checklistHtml = '';
