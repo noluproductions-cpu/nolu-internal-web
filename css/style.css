@@ -944,3 +944,39 @@ textarea.form-input {
     color: var(--danger-color);
     cursor: pointer;
 }
+
+/* Firebase Settings Styling */
+.btn-settings-gear {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    color: var(--text-primary);
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 16px;
+    transition: var(--transition-smooth);
+    padding: 0;
+}
+
+.btn-settings-gear:active {
+    transform: scale(0.9);
+}
+
+.status-dot.local {
+    background-color: var(--warning-color) !important;
+    box-shadow: 0 0 8px var(--warning-color) !important;
+}
+
+.status-dot.firebase {
+    background-color: var(--success-color) !important;
+    box-shadow: 0 0 8px var(--success-color) !important;
+}
+
+.status-dot.disconnected {
+    background-color: var(--danger-color) !important;
+    box-shadow: 0 0 8px var(--danger-color) !important;
+}

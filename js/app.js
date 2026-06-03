@@ -19,6 +19,12 @@ let activeProjectId = null;
 let activeClientId = null;
 let activeIdeaId = null;
 
+// Firebase State Variables
+let db = null;
+let isFirebaseConnected = false;
+let firebaseConfig = null;
+let fbListeners = [];
+
 // Selected filter for transactions (0 = All, 1 = Income, 2 = Expense)
 let currentTxFilter = 0;
 // Selected filter status for projects
@@ -29,22 +35,26 @@ document.addEventListener('DOMContentLoaded', () => {
     // 1. Register PWA Service Worker
     registerServiceWorker();
     
-    // 2. Load Data from localStorage
-    loadStateFromLocalStorage();
+    // 2. Try to load Firebase Configuration
+    loadFirebaseConfigFromLocalStorage();
     
-    // 3. Populate default mock data if empty
-    if (state.clients.length === 0 && state.projects.length === 0 && state.transactions.length === 0) {
-        loadMockData();
+    // 3. Connect to Firebase if config exists, otherwise load locally
+    if (firebaseConfig) {
+        connectToFirebase(firebaseConfig);
+    } else {
+        loadStateFromLocalStorage();
+        if (state.clients.length === 0 && state.projects.length === 0 && state.transactions.length === 0) {
+            loadMockData();
+        }
+        updateDbStatusUI(false);
+        renderAll();
     }
     
-    // 4. Set up CNAME/URL checks & form dates default
+    // 4. Set up form dates default and tx categories
     setDefaultFormDates();
     toggleTxCategories();
     
-    // 5. Render active screen details
-    renderAll();
-    
-    // 6. Bind Client Search Input listener
+    // 5. Bind Client Search Input listener
     document.getElementById('client-search').addEventListener('input', (e) => {
         renderClients(e.target.value.trim());
     });
@@ -58,6 +68,218 @@ function registerServiceWorker() {
                 .then(reg => console.log('Service Worker zaregistrován úspěšně.', reg.scope))
                 .catch(err => console.error('Chyba registrace Service Workera:', err));
         });
+    }
+}
+
+// MARK: - Firebase Helper Functions
+function loadFirebaseConfigFromLocalStorage() {
+    const raw = localStorage.getItem('nolu_firebase_config');
+    if (raw) {
+        try {
+            firebaseConfig = JSON.parse(raw);
+        } catch (e) {
+            console.error('Nepodařilo se parsovat Firebase config:', e);
+        }
+    }
+}
+
+function updateDbStatusUI(connected) {
+    const statusDot = document.getElementById('db-status-dot');
+    const statusText = document.getElementById('db-status-text');
+    const settingsStatusDot = document.getElementById('settings-status-dot');
+    const settingsStatusText = document.getElementById('settings-status-text');
+    const migrationBox = document.getElementById('migration-box');
+    
+    if (connected) {
+        if (statusDot) {
+            statusDot.className = 'status-dot firebase';
+            statusText.textContent = 'Firebase';
+        }
+        if (settingsStatusDot) {
+            settingsStatusDot.className = 'status-dot firebase';
+            settingsStatusText.textContent = 'Připojeno k Firebase Firestore (Cloud)';
+        }
+        if (migrationBox) {
+            migrationBox.style.display = 'block';
+        }
+        
+        // Populate configuration values in settings sheet inputs
+        const fields = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId'];
+        fields.forEach(f => {
+            const input = document.getElementById(`fb-${f}`);
+            if (input && firebaseConfig) {
+                input.value = firebaseConfig[f] || '';
+            }
+        });
+    } else {
+        if (statusDot) {
+            statusDot.className = 'status-dot local';
+            statusText.textContent = 'Lokální';
+        }
+        if (settingsStatusDot) {
+            settingsStatusDot.className = 'status-dot local';
+            settingsStatusText.textContent = 'Lokální režim (Odpojeno)';
+        }
+        if (migrationBox) {
+            migrationBox.style.display = 'none';
+        }
+    }
+}
+
+function connectToFirebase(config) {
+    if (typeof firebase === 'undefined') {
+        console.error('Firebase SDK není načteno!');
+        updateDbStatusUI(false);
+        loadStateFromLocalStorage();
+        renderAll();
+        return;
+    }
+    
+    try {
+        if (!firebase.apps.length) {
+            firebase.initializeApp(config);
+        }
+        db = firebase.firestore();
+        
+        // Enable offline persistence for PWA support
+        db.enablePersistence({ synchronizeTabs: true })
+            .catch(err => {
+                if (err.code == 'failed-precondition') {
+                    console.warn("Více otevřených tabů, persistence povolena jen v jednom.");
+                } else if (err.code == 'unimplemented') {
+                    console.warn("Prohlížeč nepodporuje offline persistenci Firestore.");
+                }
+            });
+            
+        isFirebaseConnected = true;
+        updateDbStatusUI(true);
+        setupFirestoreListeners();
+        
+    } catch (e) {
+        console.error('Chyba při připojování k Firebase:', e);
+        isFirebaseConnected = false;
+        updateDbStatusUI(false);
+        alert('Připojení k Firebase selhalo. Zkontrolujte prosím konfigurační údaje.');
+        loadStateFromLocalStorage();
+        renderAll();
+    }
+}
+
+function setupFirestoreListeners() {
+    fbListeners.forEach(unsub => unsub());
+    fbListeners = [];
+    
+    const collections = ['clients', 'projects', 'transactions', 'ideas', 'events'];
+    
+    collections.forEach(colName => {
+        const unsub = db.collection(colName).onSnapshot(snapshot => {
+            const dataList = [];
+            snapshot.forEach(doc => {
+                dataList.push({ id: doc.id, ...doc.data() });
+            });
+            
+            state[colName] = dataList;
+            renderAll();
+            
+            // Refresh details sheets if they are active
+            if (colName === 'clients' && activeClientId) {
+                const client = state.clients.find(c => c.id === activeClientId);
+                if (client) viewClientDetail(activeClientId);
+            } else if (colName === 'projects' && activeProjectId) {
+                const proj = state.projects.find(p => p.id === activeProjectId);
+                if (proj) renderProjectDetailBody(proj);
+            } else if (colName === 'ideas' && activeIdeaId) {
+                const idea = state.ideas.find(i => i.id === activeIdeaId);
+                if (idea) viewIdeaDetail(activeIdeaId);
+            }
+        }, err => {
+            console.error(`Chyba firestore listeneru pro ${colName}:`, err);
+        });
+        fbListeners.push(unsub);
+    });
+}
+
+function saveFirebaseConfig(e) {
+    e.preventDefault();
+    
+    const config = {
+        apiKey: document.getElementById('fb-apiKey').value.trim(),
+        authDomain: document.getElementById('fb-authDomain').value.trim(),
+        projectId: document.getElementById('fb-projectId').value.trim(),
+        storageBucket: document.getElementById('fb-storageBucket').value.trim(),
+        messagingSenderId: document.getElementById('fb-messagingSenderId').value.trim(),
+        appId: document.getElementById('fb-appId').value.trim()
+    };
+    
+    localStorage.setItem('nolu_firebase_config', JSON.stringify(config));
+    firebaseConfig = config;
+    location.reload();
+}
+
+function clearFirebaseConfig() {
+    if (confirm('Opravdu chcete odpojit Firebase a přejít zpět do lokálního režimu?')) {
+        localStorage.removeItem('nolu_firebase_config');
+        location.reload();
+    }
+}
+
+function migrateLocalDataToFirebase() {
+    if (!isFirebaseConnected || !db) {
+        alert('Firebase není připojeno!');
+        return;
+    }
+    
+    const rawLocal = localStorage.getItem('nolu_studio_state');
+    if (!rawLocal) {
+        alert('Nenalezena žádná lokální data k migraci.');
+        return;
+    }
+    
+    let localState;
+    try {
+        localState = JSON.parse(rawLocal);
+    } catch(e) {
+        alert('Chyba při načítání lokálních dat.');
+        return;
+    }
+    
+    const collections = ['clients', 'projects', 'transactions', 'ideas', 'events'];
+    let totalItems = 0;
+    
+    collections.forEach(colName => {
+        if (localState[colName] && Array.isArray(localState[colName])) {
+            totalItems += localState[colName].length;
+        }
+    });
+    
+    if (totalItems === 0) {
+        alert('Lokální data jsou prázdná, není co migrovat.');
+        return;
+    }
+    
+    if (confirm(`Chcete nahrát ${totalItems} položek z tohoto zařízení do Firebase cloudu?`)) {
+        const batch = db.batch();
+        let addedCount = 0;
+        
+        collections.forEach(colName => {
+            const items = localState[colName];
+            if (items && Array.isArray(items)) {
+                items.forEach(item => {
+                    const docRef = db.collection(colName).doc(item.id);
+                    batch.set(docRef, item);
+                    addedCount++;
+                });
+            }
+        });
+        
+        batch.commit()
+            .then(() => {
+                alert(`Úspěšně nahráno ${addedCount} položek do Firebase. Data jsou nyní sdílená.`);
+            })
+            .catch(err => {
+                console.error('Chyba migrace dat:', err);
+                alert('Chyba při nahrávání dat do databáze. Zkontrolujte prosím Firestore Rules.');
+            });
     }
 }
 
@@ -600,13 +822,18 @@ function saveClient(e) {
         notes
     };
     
-    state.clients.push(newClient);
-    saveStateToLocalStorage();
+    if (isFirebaseConnected && db) {
+        db.collection('clients').doc(newClient.id).set(newClient)
+            .catch(err => console.error("Chyba při ukládání klienta:", err));
+    } else {
+        state.clients.push(newClient);
+        saveStateToLocalStorage();
+        renderAll();
+    }
     
     // Reset Form & Close
     document.getElementById('form-add-client').reset();
     closeSheet('sheet-add-client');
-    renderAll();
 }
 
 // Save Project Form Submission
@@ -636,13 +863,18 @@ function saveProject(e) {
         deliverables: []
     };
     
-    state.projects.push(newProj);
-    saveStateToLocalStorage();
+    if (isFirebaseConnected && db) {
+        db.collection('projects').doc(newProj.id).set(newProj)
+            .catch(err => console.error("Chyba při ukládání projektu:", err));
+    } else {
+        state.projects.push(newProj);
+        saveStateToLocalStorage();
+        renderAll();
+    }
     
     document.getElementById('form-add-project').reset();
     setDefaultFormDates();
     closeSheet('sheet-add-project');
-    renderAll();
 }
 
 // Save Transaction Form Submission
@@ -664,13 +896,18 @@ function saveTransaction(e) {
         date
     };
     
-    state.transactions.push(newTx);
-    saveStateToLocalStorage();
+    if (isFirebaseConnected && db) {
+        db.collection('transactions').doc(newTx.id).set(newTx)
+            .catch(err => console.error("Chyba při ukládání transakce:", err));
+    } else {
+        state.transactions.push(newTx);
+        saveStateToLocalStorage();
+        renderAll();
+    }
     
     document.getElementById('form-add-transaction').reset();
     setDefaultFormDates();
     closeSheet('sheet-add-transaction');
-    renderAll();
 }
 
 // Save Event Form Submission
@@ -694,13 +931,18 @@ function saveEvent(e) {
         notes
     };
     
-    state.events.push(newEvent);
-    saveStateToLocalStorage();
+    if (isFirebaseConnected && db) {
+        db.collection('events').doc(newEvent.id).set(newEvent)
+            .catch(err => console.error("Chyba při ukládání události:", err));
+    } else {
+        state.events.push(newEvent);
+        saveStateToLocalStorage();
+        renderAll();
+    }
     
     document.getElementById('form-add-event').reset();
     setDefaultFormDates();
     closeSheet('sheet-add-event');
-    renderAll();
 }
 
 // Save Idea / Scripts Form Submission
@@ -719,15 +961,20 @@ function saveIdea(e) {
         hooks: [...tempHooksList]
     };
     
-    state.ideas.push(newIdea);
-    saveStateToLocalStorage();
+    if (isFirebaseConnected && db) {
+        db.collection('ideas').doc(newIdea.id).set(newIdea)
+            .catch(err => console.error("Chyba při ukládání nápadu:", err));
+    } else {
+        state.ideas.push(newIdea);
+        saveStateToLocalStorage();
+        renderAll();
+    }
     
     // Clear temp list & reset
     tempHooksList = [];
     document.getElementById('idea-hooks-temp-container').innerHTML = '';
     document.getElementById('form-add-idea').reset();
     closeSheet('sheet-add-idea');
-    renderAll();
 }
 
 // Dynamic hook list item adding
@@ -817,31 +1064,47 @@ function viewClientDetail(id) {
 }
 
 function updateClientStatus(id, newStatus) {
-    const idx = state.clients.findIndex(c => c.id === id);
-    if (idx !== -1) {
-        state.clients[idx].status = newStatus;
-        saveStateToLocalStorage();
-        renderClients();
-        renderDashboard();
+    if (isFirebaseConnected && db) {
+        db.collection('clients').doc(id).update({ status: newStatus })
+            .catch(err => console.error("Chyba při aktualizaci stavu klienta:", err));
+    } else {
+        const idx = state.clients.findIndex(c => c.id === id);
+        if (idx !== -1) {
+            state.clients[idx].status = newStatus;
+            saveStateToLocalStorage();
+            renderClients();
+            renderDashboard();
+        }
     }
 }
 
 function updateClientNotes(id, notes) {
-    const idx = state.clients.findIndex(c => c.id === id);
-    if (idx !== -1) {
-        state.clients[idx].notes = notes;
-        saveStateToLocalStorage();
-        renderClients();
+    if (isFirebaseConnected && db) {
+        db.collection('clients').doc(id).update({ notes: notes })
+            .catch(err => console.error("Chyba při aktualizaci poznámek klienta:", err));
+    } else {
+        const idx = state.clients.findIndex(c => c.id === id);
+        if (idx !== -1) {
+            state.clients[idx].notes = notes;
+            saveStateToLocalStorage();
+            renderClients();
+        }
     }
 }
 
 function deleteClient(id) {
     if (confirm('Opravdu chcete tohoto klienta smazat?')) {
-        state.clients = state.clients.filter(c => c.id !== id);
-        saveStateToLocalStorage();
-        closeSheet('sheet-client-detail');
-        renderClients();
-        renderDashboard();
+        if (isFirebaseConnected && db) {
+            db.collection('clients').doc(id).delete()
+                .then(() => closeSheet('sheet-client-detail'))
+                .catch(err => console.error("Chyba při mazání klienta:", err));
+        } else {
+            state.clients = state.clients.filter(c => c.id !== id);
+            saveStateToLocalStorage();
+            closeSheet('sheet-client-detail');
+            renderClients();
+            renderDashboard();
+        }
     }
 }
 
@@ -924,22 +1187,35 @@ function renderProjectDetailBody(proj) {
 }
 
 function updateProjectStatus(id, newStatus) {
-    const idx = state.projects.findIndex(p => p.id === id);
-    if (idx !== -1) {
-        state.projects[idx].status = newStatus;
-        saveStateToLocalStorage();
-        renderProjects();
-        renderDashboard();
+    if (isFirebaseConnected && db) {
+        db.collection('projects').doc(id).update({ status: newStatus })
+            .catch(err => console.error("Chyba při aktualizaci stavu projektu:", err));
+    } else {
+        const idx = state.projects.findIndex(p => p.id === id);
+        if (idx !== -1) {
+            state.projects[idx].status = newStatus;
+            saveStateToLocalStorage();
+            renderProjects();
+            renderDashboard();
+        }
     }
 }
 
 function toggleProjectTask(projId, taskIdx) {
     const projIdx = state.projects.findIndex(p => p.id === projId);
     if (projIdx !== -1) {
-        state.projects[projIdx].tasks[taskIdx].isCompleted = !state.projects[projIdx].tasks[taskIdx].isCompleted;
-        saveStateToLocalStorage();
-        renderProjects();
-        renderProjectDetailBody(state.projects[projIdx]);
+        const tasks = [...state.projects[projIdx].tasks];
+        tasks[taskIdx].isCompleted = !tasks[taskIdx].isCompleted;
+        
+        if (isFirebaseConnected && db) {
+            db.collection('projects').doc(projId).update({ tasks: tasks })
+                .catch(err => console.error("Chyba při přepnutí úkolu:", err));
+        } else {
+            state.projects[projIdx].tasks = tasks;
+            saveStateToLocalStorage();
+            renderProjects();
+            renderProjectDetailBody(state.projects[projIdx]);
+        }
     }
 }
 
@@ -955,22 +1231,35 @@ function addInlineTask(projId) {
             title,
             isCompleted: false
         };
-        state.projects[projIdx].tasks.push(newTask);
-        saveStateToLocalStorage();
+        const tasks = [...(state.projects[projIdx].tasks || []), newTask];
         
-        input.value = '';
-        renderProjects();
-        renderProjectDetailBody(state.projects[projIdx]);
+        if (isFirebaseConnected && db) {
+            db.collection('projects').doc(projId).update({ tasks: tasks })
+                .then(() => { input.value = ''; })
+                .catch(err => console.error("Chyba při přidání úkolu:", err));
+        } else {
+            state.projects[projIdx].tasks = tasks;
+            saveStateToLocalStorage();
+            input.value = '';
+            renderProjects();
+            renderProjectDetailBody(state.projects[projIdx]);
+        }
     }
 }
 
 function deleteProject(id) {
     if (confirm('Opravdu chcete tuto zakázku smazat?')) {
-        state.projects = state.projects.filter(p => p.id !== id);
-        saveStateToLocalStorage();
-        closeSheet('sheet-project-detail');
-        renderProjects();
-        renderDashboard();
+        if (isFirebaseConnected && db) {
+            db.collection('projects').doc(id).delete()
+                .then(() => closeSheet('sheet-project-detail'))
+                .catch(err => console.error("Chyba při mazání projektu:", err));
+        } else {
+            state.projects = state.projects.filter(p => p.id !== id);
+            saveStateToLocalStorage();
+            closeSheet('sheet-project-detail');
+            renderProjects();
+            renderDashboard();
+        }
     }
 }
 
@@ -1017,19 +1306,30 @@ function viewIdeaDetail(id) {
 }
 
 function updateIdeaScript(id, script) {
-    const idx = state.ideas.findIndex(i => i.id === id);
-    if (idx !== -1) {
-        state.ideas[idx].script = script;
-        saveStateToLocalStorage();
-        renderIdeas();
+    if (isFirebaseConnected && db) {
+        db.collection('ideas').doc(id).update({ script: script })
+            .catch(err => console.error("Chyba při aktualizaci scénáře:", err));
+    } else {
+        const idx = state.ideas.findIndex(i => i.id === id);
+        if (idx !== -1) {
+            state.ideas[idx].script = script;
+            saveStateToLocalStorage();
+            renderIdeas();
+        }
     }
 }
 
 function deleteIdea(id) {
     if (confirm('Opravdu chcete tento nápad smazat?')) {
-        state.ideas = state.ideas.filter(i => i.id !== id);
-        saveStateToLocalStorage();
-        closeSheet('sheet-idea-detail');
-        renderIdeas();
+        if (isFirebaseConnected && db) {
+            db.collection('ideas').doc(id).delete()
+                .then(() => closeSheet('sheet-idea-detail'))
+                .catch(err => console.error("Chyba při mazání nápadu:", err));
+        } else {
+            state.ideas = state.ideas.filter(i => i.id !== id);
+            saveStateToLocalStorage();
+            closeSheet('sheet-idea-detail');
+            renderIdeas();
+        }
     }
 }

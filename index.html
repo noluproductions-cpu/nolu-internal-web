@@ -21,6 +21,10 @@
     <!-- CSS stylesheet -->
     <link rel="stylesheet" href="css/style.css">
     
+    <!-- Firebase SDK (Compat v9/v10) via CDN -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    
     <!-- JS script (loaded with defer) -->
     <script src="js/app.js" defer></script>
 </head>
@@ -39,9 +43,12 @@
                 <span class="screen-subtitle">NOLU Productions</span>
                 <h1>Nástěnka</h1>
             </div>
-            <div class="status-pill">
-                <span class="status-dot"></span>
-                <span>Interní režim</span>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <button class="btn-settings-gear" onclick="openSheet('sheet-settings')" title="Nastavení Firebase">⚙️</button>
+                <div class="status-pill">
+                    <span class="status-dot" id="db-status-dot"></span>
+                    <span id="db-status-text">Lokální</span>
+                </div>
             </div>
         </div>
         
@@ -211,6 +218,77 @@
     </nav>
 
     <!-- MARK: - MODAL SHEETS (SLIDING FROM BOTTOM) -->
+
+    <!-- Sheet: Settings (Firebase Configuration) -->
+    <div class="modal-sheet-overlay" id="sheet-settings">
+        <div class="modal-sheet">
+            <div class="modal-sheet-drag-handle"></div>
+            <div class="modal-sheet-header">
+                <span class="modal-sheet-title">Nastavení synchronizace</span>
+                <button class="modal-sheet-close-btn" onclick="closeSheet('sheet-settings')">Zavřít</button>
+            </div>
+            <div class="modal-sheet-content">
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <div style="font-size: 32px; margin-bottom: 8px;">☁️</div>
+                    <h3 style="font-size: 18px; font-weight: 700; color: var(--text-primary);">Připojení Firebase Firestore</h3>
+                    <p style="font-size: 12px; color: var(--text-secondary); margin-top: 4px; line-height: 1.4;">
+                        Zadejte konfigurační údaje z vašeho Firebase projektu. Data se budou v reálném čase synchronizovat mezi zařízeními.
+                    </p>
+                </div>
+
+                <div class="glass-card" style="margin-bottom: 20px; padding: 12px;">
+                    <div style="display: flex; align-items: center; gap: 8px; font-size: 13px;">
+                        <span>Stav připojení:</span>
+                        <span class="status-dot" id="settings-status-dot" style="margin: 0;"></span>
+                        <strong id="settings-status-text" style="color: var(--text-primary);">Lokální režim (Odpojeno)</strong>
+                    </div>
+                </div>
+
+                <form id="form-settings" onsubmit="saveFirebaseConfig(event)">
+                    <div class="form-group">
+                        <label class="form-label">API Key</label>
+                        <input type="text" class="form-input" id="fb-apiKey" placeholder="AIzaSy..." required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Auth Domain</label>
+                        <input type="text" class="form-input" id="fb-authDomain" placeholder="projekt-id.firebaseapp.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Project ID</label>
+                        <input type="text" class="form-input" id="fb-projectId" placeholder="projekt-id" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Storage Bucket</label>
+                        <input type="text" class="form-input" id="fb-storageBucket" placeholder="projekt-id.appspot.com" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Messaging Sender ID</label>
+                        <input type="text" class="form-input" id="fb-messagingSenderId" placeholder="1234567890" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">App ID</label>
+                        <input type="text" class="form-input" id="fb-appId" placeholder="1:12345:web:abcde" required>
+                    </div>
+
+                    <div style="display: flex; gap: 12px; margin-top: 20px;">
+                        <button type="submit" class="btn-primary-form" style="margin: 0; flex: 1;">Připojit a synchronizovat</button>
+                        <button type="button" class="btn-primary-form" onclick="clearFirebaseConfig()" style="margin: 0; background: rgba(239, 68, 68, 0.2); color: #ef4444; flex: 1;">Odpojit / Reset</button>
+                    </div>
+                </form>
+
+                <!-- Data Migration tools -->
+                <div id="migration-box" class="glass-card" style="margin-top: 20px; display: none; padding: 16px;">
+                    <h4 style="font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px;">Nahrání místních dat do cloudu</h4>
+                    <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.4;">
+                        Máte v telefonu/počítači uložená lokální data? Můžete je nahrát do nové Firebase databáze, aby je viděli i ostatní.
+                    </p>
+                    <button type="button" class="btn-primary-form" onclick="migrateLocalDataToFirebase()" style="margin: 0; width: 100%; font-size: 12px; padding: 10px; background: rgba(99, 102, 241, 0.2); color: var(--accent-indigo);">
+                        📤 Nahrát místní data do Firebase
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
     
     <!-- Sheet: Add Client -->
     <div class="modal-sheet-overlay" id="sheet-add-client">
