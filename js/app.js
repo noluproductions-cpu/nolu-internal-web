@@ -378,6 +378,7 @@ function loadStateFromLocalStorage() {
     if (raw) {
         try {
             state = JSON.parse(raw);
+            if (!state.history) state.history = [];
         } catch (e) {
             console.error('Nepodařilo se parsovat data z localStorage:', e);
         }
@@ -405,6 +406,16 @@ function switchTab(index, btnEl) {
     const targetScreen = document.getElementById(screens[index]);
     if (targetScreen) {
         targetScreen.classList.add('active');
+    } else {
+        console.warn(`Obrazovka ${screens[index]} nebyla nalezena. Vynucuji vymazání cache a hard reload.`);
+        if (window.caches) {
+            caches.keys().then(names => {
+                for (let name of names) caches.delete(name);
+                window.location.reload(true);
+            });
+        } else {
+            window.location.reload(true);
+        }
     }
     
     // Trigger specific render updates if needed
@@ -506,6 +517,8 @@ function loadMockData() {
 }
 
 // MARK: - Global Rendering Router
+let isHistorySeeded = false;
+
 function renderAll() {
     renderDashboard();
     renderProjects();
@@ -513,6 +526,13 @@ function renderAll() {
     renderFinances();
     renderIdeas();
     renderHistory();
+    
+    // Automatické předvyplnění historie ze stávajících dat (pokud je prázdná)
+    if (isFirebaseConnected && db && !isHistorySeeded && state.history && state.history.length === 0 && 
+        (state.clients.length > 0 || state.projects.length > 0 || state.transactions.length > 0)) {
+        isHistorySeeded = true;
+        seedHistoryFromExistingData();
+    }
 }
 
 // MARK: - Render Dashboard Screen
@@ -1681,4 +1701,81 @@ function deleteEvent(id) {
             closeSheet('sheet-event-detail');
         }
     }
+}
+
+function seedHistoryFromExistingData() {
+    if (!isFirebaseConnected || !db) return;
+    
+    db.collection('history').limit(1).get()
+        .then(snap => {
+            if (snap.empty) {
+                console.log("Historie Firestore je prázdná, provádím seedování ze stávajících dat...");
+                
+                const batch = db.batch();
+                let operationsCount = 0;
+                
+                // Přidáme stávající klienty
+                state.clients.forEach((c, idx) => {
+                    const docRef = db.collection('history').doc();
+                    batch.set(docRef, {
+                        action: 'add',
+                        itemType: 'client',
+                        itemName: c.name,
+                        details: c.company || '',
+                        user: c.createdBy || 'Původní systém',
+                        timestamp: new Date(Date.now() - 86400000 * 3 + idx * 1000).toISOString()
+                    });
+                    operationsCount++;
+                });
+                
+                // Přidáme stávající zakázky
+                state.projects.forEach((p, idx) => {
+                    const docRef = db.collection('history').doc();
+                    batch.set(docRef, {
+                        action: 'add',
+                        itemType: 'project',
+                        itemName: p.title,
+                        details: p.clientName || '',
+                        user: p.createdBy || 'Původní systém',
+                        timestamp: new Date(Date.now() - 86400000 * 2 + idx * 1000).toISOString()
+                    });
+                    operationsCount++;
+                });
+                
+                // Přidáme stávající transakce
+                state.transactions.slice(0, 15).forEach((tx, idx) => {
+                    const docRef = db.collection('history').doc();
+                    batch.set(docRef, {
+                        action: 'add',
+                        itemType: 'transaction',
+                        itemName: tx.title,
+                        details: `${tx.amount.toLocaleString('cs-CZ')} Kč (${tx.category})`,
+                        user: tx.createdBy || 'Původní systém',
+                        timestamp: new Date(Date.now() - 86400000 * 1 + idx * 1000).toISOString()
+                    });
+                    operationsCount++;
+                });
+
+                // Přidáme stávající scénáře
+                state.ideas.forEach((i, idx) => {
+                    const docRef = db.collection('history').doc();
+                    batch.set(docRef, {
+                        action: 'add',
+                        itemType: 'idea',
+                        itemName: i.title,
+                        details: i.category === 'reels' ? 'Reels' : i.category === 'campaign' ? 'Kampaň' : i.category === 'branding' ? 'Branding' : 'Ostatní',
+                        user: i.createdBy || 'Původní systém',
+                        timestamp: new Date(Date.now() - 43200000 + idx * 1000).toISOString()
+                    });
+                    operationsCount++;
+                });
+                
+                if (operationsCount > 0) {
+                    batch.commit()
+                        .then(() => console.log("Historie byla úspěšně předvyplněna."))
+                        .catch(err => console.error("Chyba při komitování seedu historie:", err));
+                }
+            }
+        })
+        .catch(err => console.error("Chyba při kontrole prázdnosti historie:", err));
 }
