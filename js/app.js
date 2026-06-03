@@ -63,18 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setDefaultFormDates();
     toggleTxCategories();
     
-    // 5. Restore ambient glow preference
-    const glowsDisabled = localStorage.getItem('nolu_ambient_glow_disabled') === 'true';
-    const glowCheckbox = document.getElementById('setting-glow-bg');
-    if (glowCheckbox) {
-        glowCheckbox.checked = !glowsDisabled;
-    }
-    const glowEl = document.querySelector('.ambient-bg');
-    if (glowEl) {
-        glowEl.style.display = glowsDisabled ? 'none' : 'block';
-    }
-    
-    // 6. Bind Client Search Input listener
+    // 5. Bind Client Search Input listener
     document.getElementById('client-search').addEventListener('input', (e) => {
         renderClients(e.target.value.trim());
     });
@@ -1751,13 +1740,6 @@ function seedHistoryFromExistingData() {
         .catch(err => console.error("Chyba při kontrole prázdnosti historie:", err));
 }
 
-function toggleGlowBackground(enabled) {
-    const glow = document.querySelector('.ambient-bg');
-    if (glow) {
-        glow.style.display = enabled ? 'block' : 'none';
-    }
-    localStorage.setItem('nolu_ambient_glow_disabled', enabled ? 'false' : 'true');
-}
 
 function forceAppUpdate() {
     if (confirm('Chcete vymazat lokální mezipaměť a vynutit stažení nejnovější verze aplikace?')) {
