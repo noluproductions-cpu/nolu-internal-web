@@ -47,6 +47,13 @@ document.addEventListener('DOMContentLoaded', () => {
             loadMockData();
         }
         updateDbStatusUI(false);
+        
+        // Zobrazíme aplikaci a skryjeme login v lokálním režimu
+        const loginScreen = document.getElementById('screen-login');
+        const appContainer = document.getElementById('app-container');
+        if (loginScreen) loginScreen.classList.remove('active');
+        if (appContainer) appContainer.style.display = 'block';
+        
         renderAll();
     }
     
@@ -202,7 +209,7 @@ function connectToFirebase(config) {
             
         isFirebaseConnected = true;
         updateDbStatusUI(true);
-        setupFirestoreListeners();
+        setupAuthListener();
         
     } catch (e) {
         console.error('Chyba při připojování k Firebase:', e);
@@ -211,6 +218,94 @@ function connectToFirebase(config) {
         alert('Připojení k Firebase selhalo. Zkontrolujte prosím konfigurační údaje.');
         loadStateFromLocalStorage();
         renderAll();
+    }
+}
+
+function setupAuthListener() {
+    firebase.auth().onAuthStateChanged(user => {
+        const loginScreen = document.getElementById('screen-login');
+        const appContainer = document.getElementById('app-container');
+        
+        if (user) {
+            // Uživatel je přihlášen
+            if (loginScreen) loginScreen.classList.remove('active');
+            if (appContainer) appContainer.style.display = 'block';
+            
+            // Zobrazíme e-mail přihlášeného uživatele v nastavení
+            const userText = document.getElementById('logged-in-user-text');
+            if (userText) {
+                userText.textContent = `Přihlášen jako: ${user.email}`;
+            }
+            
+            // Spustíme real-time načítání dat z Firestore
+            setupFirestoreListeners();
+        } else {
+            // Uživatel není přihlášen
+            if (appContainer) appContainer.style.display = 'none';
+            if (loginScreen) loginScreen.classList.add('active');
+            
+            // Zrušíme firestore listeners a vyčistíme paměť
+            fbListeners.forEach(unsub => unsub());
+            fbListeners = [];
+            
+            state = { clients: [], projects: [], transactions: [], ideas: [], events: [] };
+            renderAll();
+        }
+    });
+}
+
+function handleLoginSubmit(e) {
+    e.preventDefault();
+    
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+    const errorEl = document.getElementById('login-error-msg');
+    
+    if (errorEl) {
+        errorEl.style.display = 'none';
+        errorEl.textContent = '';
+    }
+    
+    if (!isFirebaseConnected) {
+        alert('Firebase není připojeno!');
+        return;
+    }
+    
+    const btn = e.target.querySelector('button[type="submit"]');
+    const origText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Přihlašování...';
+    
+    firebase.auth().signInWithEmailAndPassword(email, password)
+        .then(() => {
+            btn.disabled = false;
+            btn.textContent = origText;
+        })
+        .catch(err => {
+            console.error('Chyba přihlášení:', err);
+            btn.disabled = false;
+            btn.textContent = origText;
+            
+            if (errorEl) {
+                errorEl.style.display = 'block';
+                if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+                    errorEl.textContent = 'Nesprávný e-mail nebo heslo.';
+                } else if (err.code === 'auth/invalid-email') {
+                    errorEl.textContent = 'Neplatný formát e-mailové adresy.';
+                } else {
+                    errorEl.textContent = 'Chyba přihlášení: ' + err.message;
+                }
+            }
+        });
+}
+
+function handleLogout() {
+    if (confirm('Opravdu se chcete odhlásit ze systému?')) {
+        firebase.auth().signOut()
+            .then(() => {
+                closeSheet('sheet-settings');
+            })
+            .catch(err => console.error('Chyba při odhlašování:', err));
     }
 }
 
