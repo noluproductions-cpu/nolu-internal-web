@@ -73,14 +73,31 @@ function registerServiceWorker() {
 
 // MARK: - Firebase Helper Functions
 function loadFirebaseConfigFromLocalStorage() {
+    if (localStorage.getItem('nolu_firebase_disabled') === 'true') {
+        firebaseConfig = null;
+        return;
+    }
+
     const raw = localStorage.getItem('nolu_firebase_config');
     if (raw) {
         try {
             firebaseConfig = JSON.parse(raw);
+            return;
         } catch (e) {
             console.error('Nepodařilo se parsovat Firebase config:', e);
         }
     }
+    
+    // Výchozí hardkódovaná konfigurace od uživatele
+    firebaseConfig = {
+        apiKey: "AIzaSyCLfOEBdoUspaQCJMhhq7FbYuYVS8PC8Ec",
+        authDomain: "nolu-studio.firebaseapp.com",
+        projectId: "nolu-studio",
+        storageBucket: "nolu-studio.firebasestorage.app",
+        messagingSenderId: "774167298566",
+        appId: "1:741672985666:web:ab05cd38cffa75deb0b9db",
+        measurementId: "G-TMRV632TQ8"
+    };
 }
 
 function updateDbStatusUI(connected) {
@@ -212,6 +229,7 @@ function saveFirebaseConfig(e) {
     };
     
     localStorage.setItem('nolu_firebase_config', JSON.stringify(config));
+    localStorage.removeItem('nolu_firebase_disabled'); // Povolit Firebase znovu
     firebaseConfig = config;
     location.reload();
 }
@@ -219,7 +237,96 @@ function saveFirebaseConfig(e) {
 function clearFirebaseConfig() {
     if (confirm('Opravdu chcete odpojit Firebase a přejít zpět do lokálního režimu?')) {
         localStorage.removeItem('nolu_firebase_config');
+        localStorage.setItem('nolu_firebase_disabled', 'true');
         location.reload();
+    }
+}
+
+function initializeFirebaseWithMockData() {
+    if (!isFirebaseConnected || !db) {
+        alert('Firebase není připojeno!');
+        return;
+    }
+    
+    if (confirm('Chcete nahrát základní ukázková data (klienty, projekty atd.) do Firebase databáze? Přepíše to případná stávající data se stejnými ID.')) {
+        const mockClients = [
+            { id: "c1", name: "Teodor Novák", company: "VOŠ a SPŠE Plzeň", email: "skola@spse.cz", phone: "+420 123 456 789", status: "active", notes: "Dlouhodobý klient, správa sociálních sítí." },
+            { id: "c2", name: "Jiří Král", company: "Culture Coworking", email: "info@culturecowork.ie", phone: "+353 87 123 4567", status: "completed", notes: "Irský co-working, úspěšná marketingová kampaň." },
+            { id: "c3", name: "Petr Novotný", company: "RoboVehicle 2025", email: "petr@robovehicle.cz", phone: "+420 987 654 321", status: "completed", notes: "Jednorázové pokrytí akce." }
+        ];
+        
+        const mockProjects = [
+            {
+                id: "p1",
+                title: "Správa Sítí SPŠE",
+                clientName: "VOŠ a SPŠE Plzeň",
+                tag: "Social Media",
+                status: "editing",
+                deadline: new Date(Date.now() + 86400000 * 14).toISOString().split('T')[0],
+                budget: 15000,
+                role: "PR & Produkce",
+                desc: "Každodenní tvorba obsahu, příprava grafiky, mentoring studentského týmu a správa rozpočtů.",
+                tasks: [
+                    { id: "t1_1", title: "Natočit reels ze soutěže", isCompleted: true },
+                    { id: "t1_2", title: "Sestříhat školní podcast", isCompleted: false },
+                    { id: "t1_3", title: "Připravit grafiky na příští týden", isCompleted: false }
+                ],
+                deliverables: ["10x Reels měsíčně", "2x Podcast", "Grafická kampaň"]
+            },
+            {
+                id: "p2",
+                title: "Cinematic Recap RoboVehicle",
+                clientName: "RoboVehicle 2025",
+                tag: "Video",
+                status: "delivered",
+                deadline: new Date(Date.now() - 86400000 * 3).toISOString().split('T')[0],
+                budget: 25000,
+                role: "Kamera & Střih",
+                desc: "Kompletní video a fotodokumentace pětidenní mezinárodní soutěže. Denní recapy do 12 hodin od konce akce.",
+                tasks: [
+                    { id: "t2_1", title: "Natáčení finále", isCompleted: true },
+                    { id: "t2_2", title: "Střih hlavního recap videa", isCompleted: true },
+                    { id: "t2_3", title: "Odevzdání fotek klientovi", isCompleted: true }
+                ],
+                deliverables: ["Cinematic Promo Video", "5x Daily Recap", "100x Upravená fotka"]
+            }
+        ];
+        
+        const mockTransactions = [
+            { id: "tx1", title: "Záloha - RoboVehicle", amount: 12500, type: "income", category: "Projekty", date: new Date(Date.now() - 86400000 * 10).toISOString().split('T')[0] },
+            { id: "tx2", title: "Doplatek - RoboVehicle", amount: 12500, type: "income", category: "Projekty", date: new Date(Date.now() - 86400000 * 2).toISOString().split('T')[0] },
+            { id: "tx3", title: "Měsíční paušál - SPŠE Plzeň", amount: 15000, type: "income", category: "Projekty", date: new Date(Date.now() - 86400000 * 5).toISOString().split('T')[0] },
+            { id: "tx4", title: "Nákup DJI MIC 2", amount: 9200, type: "expense", category: "Technika", date: new Date(Date.now() - 86400000 * 8).toISOString().split('T')[0] },
+            { id: "tx5", title: "Cestovné a benzín - natáčení Plzeň", amount: 1200, type: "expense", category: "Cestovné", date: new Date(Date.now() - 86400000 * 4).toISOString().split('T')[0] }
+        ];
+        
+        const mockIdeas = [
+            { id: "id1", title: "TikTok Trend - Jak točíme na iPhone", category: "reels", script: "Ukázat zákulisí natáčení na iPhone 16 Pro, rychlý střih, přechody a výsledek za 15 sekund.", hooks: ["„Tohle video bylo natočené na iPhone...“", "„Proč už s sebou netaháme těžkou kameru?“"] },
+            { id: "id2", title: "Branding koncept pro lokální kavárnu", category: "branding", script: "Minimalistické logo, zemité barvy (béžová, tmavě hnědá), zaměření na organický dosah přes lokální komunitu.", hooks: ["„Vizuál, který voní kávou.“"] }
+        ];
+        
+        const mockEvents = [
+            { id: "e1", title: "Natáčení podcastu SPŠE", type: "shooting", date: new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 16), durationHours: 3.0, location: "Ateliér SPŠE Plzeň", notes: "Nahrávání rozhovoru s ředitelem školy." },
+            { id: "e2", title: "Schůzka s novým klientem", type: "meeting", date: new Date(Date.now() + 86400000 * 4).toISOString().slice(0, 16), durationHours: 1.5, location: "Kavárna Družba", notes: "Projednání možného brandingu kavárny." },
+            { id: "e3", title: "Odevzdání videa SPŠE Plzeň", type: "deadline", date: new Date(Date.now() + 86400000 * 14).toISOString().slice(0, 16), durationHours: 0, location: "Online", notes: "Odeslání finálního sestřihu PR videa." }
+        ];
+        
+        const batch = db.batch();
+        
+        mockClients.forEach(c => batch.set(db.collection('clients').doc(c.id), c));
+        mockProjects.forEach(p => batch.set(db.collection('projects').doc(p.id), p));
+        mockTransactions.forEach(t => batch.set(db.collection('transactions').doc(t.id), t));
+        mockIdeas.forEach(i => batch.set(db.collection('ideas').doc(i.id), i));
+        mockEvents.forEach(e => batch.set(db.collection('events').doc(e.id), e));
+        
+        batch.commit()
+            .then(() => {
+                alert('Firebase databáze byla úspěšně inicializována ukázkovými daty.');
+            })
+            .catch(err => {
+                console.error('Chyba inicializace Firebase:', err);
+                alert('Nepodařilo se nahrát data do Firebase. Ujistěte se, že máte ve Firebase povolenou databázi Cloud Firestore a správně nastavená Rules (pravidla pro čtení/zápis).');
+            });
     }
 }
 
