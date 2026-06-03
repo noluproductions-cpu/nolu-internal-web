@@ -221,6 +221,26 @@
         </div>
     </div>
 
+    <!-- MARK: - 6. HISTORY SCREEN -->
+    <div id="screen-history" class="screen">
+        <div class="screen-header">
+            <div class="screen-title-group">
+                <span class="screen-subtitle">NOLU Productions</span>
+                <h1>Historie</h1>
+            </div>
+        </div>
+        
+        <div class="glass-card" style="padding: 16px; margin-bottom: 20px;">
+            <p style="font-size:12px; color:var(--text-secondary); line-height: 1.4; margin: 0;">
+                Přehled všech aktivit a změn v systému synchronizovaných v reálném čase.
+            </p>
+        </div>
+        
+        <div class="history-list" id="history-list-container">
+            <!-- Dynamic history logs -->
+        </div>
+    </div>
+
     <!-- MARK: - BOTTOM TAB BAR -->
     <nav class="bottom-nav">
         <button class="nav-tab active" onclick="switchTab(0, this)">
@@ -242,6 +262,10 @@
         <button class="nav-tab" onclick="switchTab(4, this)">
             <span class="nav-tab-icon">💡</span>
             <span>Scénáře</span>
+        </button>
+        <button class="nav-tab" onclick="switchTab(5, this)">
+            <span class="nav-tab-icon">📜</span>
+            <span>Historie</span>
         </button>
     </nav>
 
@@ -588,6 +612,20 @@
                 <button class="modal-sheet-close-btn" onclick="closeSheet('sheet-idea-detail')">Zavřít</button>
             </div>
             <div class="modal-sheet-content" id="detail-idea-body">
+                <!-- Rendered dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Sheet: EVENT DETAIL -->
+    <div class="modal-sheet-overlay" id="sheet-event-detail">
+        <div class="modal-sheet">
+            <div class="modal-sheet-drag-handle"></div>
+            <div class="modal-sheet-header">
+                <span class="modal-sheet-title" id="detail-event-header-title">Detail události</span>
+                <button class="modal-sheet-close-btn" onclick="closeSheet('sheet-event-detail')">Zavřít</button>
+            </div>
+            <div class="modal-sheet-content" id="detail-event-body">
                 <!-- Rendered dynamically -->
             </div>
         </div>

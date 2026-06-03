@@ -8,7 +8,8 @@ let state = {
     projects: [],
     transactions: [],
     ideas: [],
-    events: []
+    events: [],
+    history: []
 };
 
 // Temp hooks list for the Add Idea form
@@ -18,6 +19,7 @@ let tempHooksList = [];
 let activeProjectId = null;
 let activeClientId = null;
 let activeIdeaId = null;
+let activeEventId = null;
 
 // Firebase State Variables
 let db = null;
@@ -248,7 +250,7 @@ function setupAuthListener() {
             fbListeners.forEach(unsub => unsub());
             fbListeners = [];
             
-            state = { clients: [], projects: [], transactions: [], ideas: [], events: [] };
+            state = { clients: [], projects: [], transactions: [], ideas: [], events: [], history: [] };
             renderAll();
         }
     });
@@ -313,7 +315,7 @@ function setupFirestoreListeners() {
     fbListeners.forEach(unsub => unsub());
     fbListeners = [];
     
-    const collections = ['clients', 'projects', 'transactions', 'ideas', 'events'];
+    const collections = ['clients', 'projects', 'transactions', 'ideas', 'events', 'history'];
     
     collections.forEach(colName => {
         const unsub = db.collection(colName).onSnapshot(snapshot => {
@@ -335,6 +337,9 @@ function setupFirestoreListeners() {
             } else if (colName === 'ideas' && activeIdeaId) {
                 const idea = state.ideas.find(i => i.id === activeIdeaId);
                 if (idea) viewIdeaDetail(activeIdeaId);
+            } else if (colName === 'events' && activeEventId) {
+                const ev = state.events.find(e => e.id === activeEventId);
+                if (ev) viewEventDetail(activeEventId);
             }
         }, err => {
             console.error(`Chyba firestore listeneru pro ${colName}:`, err);
@@ -392,7 +397,8 @@ function switchTab(index, btnEl) {
         'screen-projects',
         'screen-clients',
         'screen-finances',
-        'screen-ideas'
+        'screen-ideas',
+        'screen-history'
     ];
     
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -506,6 +512,7 @@ function renderAll() {
     renderClients();
     renderFinances();
     renderIdeas();
+    renderHistory();
 }
 
 // MARK: - Render Dashboard Screen
@@ -548,13 +555,13 @@ function renderDashboard() {
                 Žádné blížící se události.
             </div>`;
     } else {
-        agendaEl.innerHTML = upcomingEvents.slice(0, 3).map(ev => {
+        agendaEl.innerHTML = upcomingEvents.slice(0, 10).map(ev => {
             const dateObj = safeParseDate(ev.date);
             const formattedDate = dateObj.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long' });
             const formattedTime = dateObj.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
             
             return `
-                <div class="agenda-item">
+                <div class="agenda-item" onclick="viewEventDetail('${ev.id}')" style="cursor:pointer;">
                     <div class="agenda-badge ${ev.type}">
                         ${getEventIcon(ev.type)}
                     </div>
@@ -812,7 +819,7 @@ function renderFinances() {
                 <div class="ledger-item">
                     <div class="ledger-info">
                         <h4>${tx.title}</h4>
-                        <p>${tx.category} • ${formattedDate}</p>
+                        <p>${tx.category} • ${formattedDate} ${tx.createdBy ? `• Přidal: ${tx.createdBy}` : ''}</p>
                     </div>
                     <span class="ledger-amount ${tx.type}">
                         ${tx.type === 'income' ? '+' : '-'}${tx.amount.toLocaleString('cs-CZ')} Kč
@@ -906,11 +913,15 @@ function saveClient(e) {
         status,
         email,
         phone,
-        notes
+        notes,
+        createdBy: getCurrentUserEmail()
     };
     
     if (isFirebaseConnected && db) {
         db.collection('clients').doc(newClient.id).set(newClient)
+            .then(() => {
+                logHistory('add', 'client', name, company);
+            })
             .catch(err => console.error("Chyba při ukládání klienta:", err));
     } else {
         state.clients.push(newClient);
@@ -947,11 +958,15 @@ function saveProject(e) {
         role,
         desc,
         tasks: [],
-        deliverables: []
+        deliverables: [],
+        createdBy: getCurrentUserEmail()
     };
     
     if (isFirebaseConnected && db) {
         db.collection('projects').doc(newProj.id).set(newProj)
+            .then(() => {
+                logHistory('add', 'project', title, clientName);
+            })
             .catch(err => console.error("Chyba při ukládání projektu:", err));
     } else {
         state.projects.push(newProj);
@@ -980,11 +995,15 @@ function saveTransaction(e) {
         amount,
         type,
         category,
-        date
+        date,
+        createdBy: getCurrentUserEmail()
     };
     
     if (isFirebaseConnected && db) {
         db.collection('transactions').doc(newTx.id).set(newTx)
+            .then(() => {
+                logHistory('add', 'transaction', title, `${amount.toLocaleString('cs-CZ')} Kč (${category})`);
+            })
             .catch(err => console.error("Chyba při ukládání transakce:", err));
     } else {
         state.transactions.push(newTx);
@@ -1015,11 +1034,15 @@ function saveEvent(e) {
         date,
         durationHours,
         location,
-        notes
+        notes,
+        createdBy: getCurrentUserEmail()
     };
     
     if (isFirebaseConnected && db) {
         db.collection('events').doc(newEvent.id).set(newEvent)
+            .then(() => {
+                logHistory('add', 'event', title, `${location} • ${date.replace('T', ' ')}`);
+            })
             .catch(err => console.error("Chyba při ukládání události:", err));
     } else {
         state.events.push(newEvent);
@@ -1045,11 +1068,16 @@ function saveIdea(e) {
         title,
         category,
         script,
-        hooks: [...tempHooksList]
+        hooks: [...tempHooksList],
+        createdBy: getCurrentUserEmail()
     };
     
     if (isFirebaseConnected && db) {
         db.collection('ideas').doc(newIdea.id).set(newIdea)
+            .then(() => {
+                const categoryName = category === 'reels' ? 'Reels' : category === 'campaign' ? 'Kampaň' : category === 'branding' ? 'Branding' : 'Ostatní';
+                logHistory('add', 'idea', title, categoryName);
+            })
             .catch(err => console.error("Chyba při ukládání nápadu:", err));
     } else {
         state.ideas.push(newIdea);
@@ -1144,6 +1172,11 @@ function viewClientDetail(id) {
             <span style="font-size:10px; color:var(--text-secondary); margin-top:4px; display:block;">Poznámky se ukládají automaticky při opuštění pole.</span>
         </div>
 
+        ${client.createdBy ? `
+        <div style="margin-top:12px; margin-bottom:12px;">
+            <span class="creator-tag">Přidal/a: ${client.createdBy}</span>
+        </div>` : ''}
+
         <button class="btn-delete-item" onclick="deleteClient('${client.id}')">Smazat klienta ze systému</button>
     `;
     
@@ -1181,9 +1214,16 @@ function updateClientNotes(id, notes) {
 
 function deleteClient(id) {
     if (confirm('Opravdu chcete tohoto klienta smazat?')) {
+        const client = state.clients.find(c => c.id === id);
+        const name = client ? client.name : 'Neznámý klient';
+        const company = client ? client.company : '';
+        
         if (isFirebaseConnected && db) {
             db.collection('clients').doc(id).delete()
-                .then(() => closeSheet('sheet-client-detail'))
+                .then(() => {
+                    logHistory('delete', 'client', name, company);
+                    closeSheet('sheet-client-detail');
+                })
                 .catch(err => console.error("Chyba při mazání klienta:", err));
         } else {
             state.clients = state.clients.filter(c => c.id !== id);
@@ -1269,6 +1309,11 @@ function renderProjectDetailBody(proj) {
             <p style="font-size:13px; line-height:1.5;">${proj.desc || 'Bez podrobného popisu.'}</p>
         </div>
 
+        ${proj.createdBy ? `
+        <div style="margin-top:12px; margin-bottom:12px;">
+            <span class="creator-tag">Přidal/a: ${proj.createdBy}</span>
+        </div>` : ''}
+
         <button class="btn-delete-item" onclick="deleteProject('${proj.id}')">Odstranit zakázku ze systému</button>
     `;
 }
@@ -1336,9 +1381,16 @@ function addInlineTask(projId) {
 
 function deleteProject(id) {
     if (confirm('Opravdu chcete tuto zakázku smazat?')) {
+        const proj = state.projects.find(p => p.id === id);
+        const title = proj ? proj.title : 'Neznámý projekt';
+        const clientName = proj ? proj.clientName : '';
+        
         if (isFirebaseConnected && db) {
             db.collection('projects').doc(id).delete()
-                .then(() => closeSheet('sheet-project-detail'))
+                .then(() => {
+                    logHistory('delete', 'project', title, clientName);
+                    closeSheet('sheet-project-detail');
+                })
                 .catch(err => console.error("Chyba při mazání projektu:", err));
         } else {
             state.projects = state.projects.filter(p => p.id !== id);
@@ -1386,6 +1438,11 @@ function viewIdeaDetail(id) {
             <span style="font-size:10px; color:var(--text-secondary); margin-top:4px; display:block;">Scénář se ukládá automaticky při opuštění pole.</span>
         </div>
 
+        ${idea.createdBy ? `
+        <div style="margin-top:12px; margin-bottom:12px;">
+            <span class="creator-tag">Přidal/a: ${idea.createdBy}</span>
+        </div>` : ''}
+
         <button class="btn-delete-item" onclick="deleteIdea('${idea.id}')">Smazat tento koncept</button>
     `;
     
@@ -1408,15 +1465,220 @@ function updateIdeaScript(id, script) {
 
 function deleteIdea(id) {
     if (confirm('Opravdu chcete tento nápad smazat?')) {
+        const idea = state.ideas.find(i => i.id === id);
+        const title = idea ? idea.title : 'Neznámý scénář';
+        const category = idea ? idea.category : '';
+        const categoryName = category === 'reels' ? 'Reels' : category === 'campaign' ? 'Kampaň' : category === 'branding' ? 'Branding' : 'Ostatní';
+        
         if (isFirebaseConnected && db) {
             db.collection('ideas').doc(id).delete()
-                .then(() => closeSheet('sheet-idea-detail'))
+                .then(() => {
+                    logHistory('delete', 'idea', title, categoryName);
+                    closeSheet('sheet-idea-detail');
+                })
                 .catch(err => console.error("Chyba při mazání nápadu:", err));
         } else {
             state.ideas = state.ideas.filter(i => i.id !== id);
             saveStateToLocalStorage();
             closeSheet('sheet-idea-detail');
             renderIdeas();
+        }
+    }
+}
+
+// MARK: - History Timeline & Event Management Functions
+function getCurrentUserEmail() {
+    if (typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser) {
+        return firebase.auth().currentUser.email || 'Neznámý uživatel';
+    }
+    return 'Lokální uživatel';
+}
+
+function logHistory(action, itemType, itemName, details = '') {
+    if (!isFirebaseConnected || !db) return;
+    
+    const userEmail = getCurrentUserEmail();
+    const logEntry = {
+        action: action,
+        itemType: itemType,
+        itemName: itemName,
+        details: details,
+        user: userEmail,
+        timestamp: new Date().toISOString()
+    };
+    
+    db.collection('history').add(logEntry)
+        .catch(err => console.error("Chyba zápisu do historie:", err));
+}
+
+function renderHistory() {
+    const container = document.getElementById('history-list-container');
+    if (!container) return;
+    
+    if (!state.history || state.history.length === 0) {
+        container.innerHTML = `
+            <div style="text-align:center; padding:30px; color:var(--text-secondary);">
+                Žádné záznamy v historii.
+            </div>`;
+        return;
+    }
+    
+    const sortedHistory = [...state.history].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    
+    container.innerHTML = sortedHistory.map(item => {
+        const dateObj = new Date(item.timestamp);
+        const formattedDate = dateObj.toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' });
+        const formattedTime = dateObj.toLocaleTimeString('cs-CZ', { hour: '2-digit', minute: '2-digit' });
+        
+        let actionClass = 'update';
+        let actionIcon = '✏️';
+        let actionText = 'upravil/a';
+        
+        if (item.action === 'add') {
+            actionClass = 'add';
+            actionIcon = '🆕';
+            actionText = 'přidal/a';
+        } else if (item.action === 'delete') {
+            actionClass = 'delete';
+            actionIcon = '🗑️';
+            actionText = 'smazal/a';
+        }
+        
+        let typeText = 'položku';
+        if (item.itemType === 'client') typeText = 'klienta';
+        else if (item.itemType === 'project') typeText = 'zakázku';
+        else if (item.itemType === 'transaction') typeText = 'transakci';
+        else if (item.itemType === 'idea') typeText = 'scénář/nápad';
+        else if (item.itemType === 'event') typeText = 'program/událost';
+        
+        return `
+            <div class="history-item ${actionClass}">
+                <div class="history-icon">${actionIcon}</div>
+                <div class="history-info">
+                    <h4>${item.itemName}</h4>
+                    <p>Uživatel <strong>${item.user}</strong> ${actionText} ${typeText}. ${item.details ? `(${item.details})` : ''}</p>
+                </div>
+                <div class="history-time">
+                    <div>${formattedDate}</div>
+                    <div style="font-size: 9px; opacity: 0.7;">${formattedTime}</div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function viewEventDetail(id) {
+    activeEventId = id;
+    const ev = state.events.find(e => e.id === id);
+    if (!ev) return;
+    
+    const body = document.getElementById('detail-event-body');
+    body.innerHTML = `
+        <form id="form-edit-event" onsubmit="updateEvent(event, '${ev.id}')">
+            <div class="form-group">
+                <label class="form-label">Název události</label>
+                <input type="text" class="form-input" id="edit-event-title" value="${ev.title}" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Typ události</label>
+                <select class="form-input form-select" id="edit-event-type">
+                    <option value="shooting" ${ev.type === 'shooting' ? 'selected' : ''}>Natáčení 🎥</option>
+                    <option value="meeting" ${ev.type === 'meeting' ? 'selected' : ''}>Schůzka 🤝</option>
+                    <option value="deadline" ${ev.type === 'deadline' ? 'selected' : ''}>Uzávěrka ⏰</option>
+                    <option value="other" ${ev.type === 'other' ? 'selected' : ''}>Ostatní 📌</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Datum a čas</label>
+                <input type="datetime-local" class="form-input" id="edit-event-date" value="${ev.date}" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Doba trvání (v hodinách)</label>
+                <input type="number" step="0.5" class="form-input" id="edit-event-duration" value="${ev.durationHours || 2}" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Místo konání</label>
+                <input type="text" class="form-input" id="edit-event-location" value="${ev.location}" required>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Poznámka</label>
+                <textarea class="form-input" id="edit-event-notes" style="height: 100px;">${ev.notes || ''}</textarea>
+            </div>
+            
+            ${ev.createdBy ? `
+            <div style="margin-bottom: 16px;">
+                <span class="creator-tag">Přidal/a: ${ev.createdBy}</span>
+            </div>` : ''}
+            
+            <div style="display: flex; gap: 12px; margin-top: 20px;">
+                <button type="submit" class="btn-primary-form" style="margin: 0; flex: 1;">Uložit změny</button>
+                <button type="button" class="btn-primary-form" onclick="deleteEvent('${ev.id}')" style="margin: 0; background: rgba(239, 68, 68, 0.2); color: #ef4444; flex: 1;">Odstranit</button>
+            </div>
+        </form>
+    `;
+    
+    openSheet('sheet-event-detail');
+}
+
+function updateEvent(e, id) {
+    e.preventDefault();
+    
+    const title = document.getElementById('edit-event-title').value.trim();
+    const type = document.getElementById('edit-event-type').value;
+    const date = document.getElementById('edit-event-date').value;
+    const durationHours = parseFloat(document.getElementById('edit-event-duration').value) || 0;
+    const location = document.getElementById('edit-event-location').value.trim();
+    const notes = document.getElementById('edit-event-notes').value.trim();
+    
+    const ev = state.events.find(item => item.id === id);
+    if (!ev) return;
+    
+    const updatedEvent = {
+        ...ev,
+        title,
+        type,
+        date,
+        durationHours,
+        location,
+        notes
+    };
+    
+    if (isFirebaseConnected && db) {
+        db.collection('events').doc(id).set(updatedEvent)
+            .then(() => {
+                logHistory('update', 'event', title, `Změna času/místa: ${location} • ${date.replace('T', ' ')}`);
+                closeSheet('sheet-event-detail');
+            })
+            .catch(err => console.error("Chyba při úpravě události:", err));
+    } else {
+        const idx = state.events.findIndex(item => item.id === id);
+        if (idx !== -1) {
+            state.events[idx] = updatedEvent;
+            saveStateToLocalStorage();
+            renderAll();
+        }
+        closeSheet('sheet-event-detail');
+    }
+}
+
+function deleteEvent(id) {
+    if (confirm('Opravdu chcete tuto událost smazat z programu?')) {
+        const ev = state.events.find(item => item.id === id);
+        const title = ev ? ev.title : 'Neznámá událost';
+        const location = ev ? ev.location : '';
+        
+        if (isFirebaseConnected && db) {
+            db.collection('events').doc(id).delete()
+                .then(() => {
+                    logHistory('delete', 'event', title, location);
+                    closeSheet('sheet-event-detail');
+                })
+                .catch(err => console.error("Chyba při mazání události:", err));
+        } else {
+            state.events = state.events.filter(item => item.id !== id);
+            saveStateToLocalStorage();
+            renderAll();
+            closeSheet('sheet-event-detail');
         }
     }
 }
