@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nolu-studio-cache-v6';
+const CACHE_NAME = 'nolu-studio-cache-v7';
 const ASSETS = [
   'index.html',
   'css/style.css',

@@ -63,7 +63,18 @@ document.addEventListener('DOMContentLoaded', () => {
     setDefaultFormDates();
     toggleTxCategories();
     
-    // 5. Bind Client Search Input listener
+    // 5. Restore ambient glow preference
+    const glowsDisabled = localStorage.getItem('nolu_ambient_glow_disabled') === 'true';
+    const glowCheckbox = document.getElementById('setting-glow-bg');
+    if (glowCheckbox) {
+        glowCheckbox.checked = !glowsDisabled;
+    }
+    const glowEl = document.querySelector('.ambient-bg');
+    if (glowEl) {
+        glowEl.style.display = glowsDisabled ? 'none' : 'block';
+    }
+    
+    // 6. Bind Client Search Input listener
     document.getElementById('client-search').addEventListener('input', (e) => {
         renderClients(e.target.value.trim());
     });
@@ -114,22 +125,7 @@ function registerServiceWorker() {
 
 // MARK: - Firebase Helper Functions
 function loadFirebaseConfigFromLocalStorage() {
-    if (localStorage.getItem('nolu_firebase_disabled') === 'true') {
-        firebaseConfig = null;
-        return;
-    }
-
-    const raw = localStorage.getItem('nolu_firebase_config');
-    if (raw) {
-        try {
-            firebaseConfig = JSON.parse(raw);
-            return;
-        } catch (e) {
-            console.error('Nepodařilo se parsovat Firebase config:', e);
-        }
-    }
-    
-    // Výchozí hardkódovaná konfigurace od uživatele
+    // Výchozí hardkódovaná konfigurace od uživatele (Uzamčeno pro stabilitu)
     firebaseConfig = {
         apiKey: "AIzaSyCLfoEbdoUspaQCJMhhq7FbYuYVS8PC8Ec",
         authDomain: "nolu-studio.firebaseapp.com",
@@ -160,15 +156,6 @@ function updateDbStatusUI(connected) {
         if (migrationBox) {
             migrationBox.style.display = 'block';
         }
-        
-        // Populate configuration values in settings sheet inputs
-        const fields = ['apiKey', 'authDomain', 'projectId', 'storageBucket', 'messagingSenderId', 'appId'];
-        fields.forEach(f => {
-            const input = document.getElementById(`fb-${f}`);
-            if (input && firebaseConfig) {
-                input.value = firebaseConfig[f] || '';
-            }
-        });
     } else {
         if (statusDot) {
             statusDot.className = 'status-dot local';
@@ -348,23 +335,7 @@ function setupFirestoreListeners() {
     });
 }
 
-function saveFirebaseConfig(e) {
-    e.preventDefault();
-    
-    const config = {
-        apiKey: document.getElementById('fb-apiKey').value.trim(),
-        authDomain: document.getElementById('fb-authDomain').value.trim(),
-        projectId: document.getElementById('fb-projectId').value.trim(),
-        storageBucket: document.getElementById('fb-storageBucket').value.trim(),
-        messagingSenderId: document.getElementById('fb-messagingSenderId').value.trim(),
-        appId: document.getElementById('fb-appId').value.trim()
-    };
-    
-    localStorage.setItem('nolu_firebase_config', JSON.stringify(config));
-    localStorage.removeItem('nolu_firebase_disabled'); // Povolit Firebase znovu
-    firebaseConfig = config;
-    location.reload();
-}
+// Ukládání nastavení již probíhá plně na pozadí, konfigurační formulář odstraněn.
 
 
 
@@ -1778,4 +1749,25 @@ function seedHistoryFromExistingData() {
             }
         })
         .catch(err => console.error("Chyba při kontrole prázdnosti historie:", err));
+}
+
+function toggleGlowBackground(enabled) {
+    const glow = document.querySelector('.ambient-bg');
+    if (glow) {
+        glow.style.display = enabled ? 'block' : 'none';
+    }
+    localStorage.setItem('nolu_ambient_glow_disabled', enabled ? 'false' : 'true');
+}
+
+function forceAppUpdate() {
+    if (confirm('Chcete vymazat lokální mezipaměť a vynutit stažení nejnovější verze aplikace?')) {
+        if (window.caches) {
+            caches.keys().then(names => {
+                for (let name of names) caches.delete(name);
+                window.location.reload(true);
+            });
+        } else {
+            window.location.reload(true);
+        }
+    }
 }

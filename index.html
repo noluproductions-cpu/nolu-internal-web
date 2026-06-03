@@ -271,62 +271,65 @@
 
     <!-- MARK: - MODAL SHEETS (SLIDING FROM BOTTOM) -->
 
-    <!-- Sheet: Settings (Firebase Configuration) -->
+    <!-- Sheet: Settings (System Settings) -->
     <div class="modal-sheet-overlay" id="sheet-settings">
         <div class="modal-sheet">
             <div class="modal-sheet-drag-handle"></div>
             <div class="modal-sheet-header">
-                <span class="modal-sheet-title">Nastavení synchronizace</span>
+                <span class="modal-sheet-title">Nastavení systému</span>
                 <button class="modal-sheet-close-btn" onclick="closeSheet('sheet-settings')">Zavřít</button>
             </div>
             <div class="modal-sheet-content">
                 <div style="text-align: center; margin-bottom: 20px;">
-                    <div style="font-size: 32px; margin-bottom: 8px;">☁️</div>
-                    <h3 style="font-size: 18px; font-weight: 700; color: var(--text-primary);">Připojení Firebase Firestore</h3>
+                    <div style="font-size: 32px; margin-bottom: 8px;">⚙️</div>
+                    <h3 style="font-size: 18px; font-weight: 700; color: var(--text-primary);">Nastavení NOLU Studio</h3>
                     <p style="font-size: 12px; color: var(--text-secondary); margin-top: 4px; line-height: 1.4;">
-                        Zadejte konfigurační údaje z vašeho Firebase projektu. Data se budou v reálném čase synchronizovat mezi zařízeními.
+                        Správa přihlášení, stavu připojení a vzhledu aplikace.
                     </p>
                 </div>
 
-                <div class="glass-card" style="margin-bottom: 20px; padding: 12px;">
-                    <div style="display: flex; align-items: center; gap: 8px; font-size: 13px;">
-                        <span>Stav připojení:</span>
-                        <span class="status-dot" id="settings-status-dot" style="margin: 0;"></span>
-                        <strong id="settings-status-text" style="color: var(--text-primary);">Lokální režim (Odpojeno)</strong>
+                <!-- Sync status -->
+                <div class="glass-card" style="margin-bottom: 16px; padding: 16px;">
+                    <div style="display: flex; align-items: center; gap: 8px; font-size: 13px; margin-bottom: 8px;">
+                        <span>Synchronizace dat:</span>
+                        <span class="status-dot firebase" id="settings-status-dot" style="margin: 0;"></span>
+                        <strong id="settings-status-text" style="color: var(--text-primary);">Připojeno k Firebase (Cloud)</strong>
+                    </div>
+                    <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;">
+                        Projekt: <strong style="color: var(--text-primary);">nolu-studio</strong><br>
+                        Stav: <span style="color: var(--success-color);">Synchronizováno v reálném čase</span>
                     </div>
                 </div>
 
-                <form id="form-settings" onsubmit="saveFirebaseConfig(event)">
-                    <div class="form-group">
-                        <label class="form-label">API Key</label>
-                        <input type="text" class="form-input" id="fb-apiKey" placeholder="AIzaSy..." required>
+                <!-- Glow background toggle -->
+                <div class="glass-card" style="margin-bottom: 16px; padding: 16px;">
+                    <h4 style="font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 10px;">Vzhled a efekty</h4>
+                    <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12px;">
+                        <div>
+                            <strong style="color: var(--text-primary); display: block; margin-bottom: 2px;">Světelné efekty na pozadí</strong>
+                            <span style="font-size: 10px; color: var(--text-secondary);">Vypnutí šetří baterii na starších telefonech.</span>
+                        </div>
+                        <label class="switch-container">
+                            <input type="checkbox" id="setting-glow-bg" checked onchange="toggleGlowBackground(this.checked)">
+                            <span class="switch-slider"></span>
+                        </label>
                     </div>
-                    <div class="form-group">
-                        <label class="form-label">Auth Domain</label>
-                        <input type="text" class="form-input" id="fb-authDomain" placeholder="projekt-id.firebaseapp.com" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Project ID</label>
-                        <input type="text" class="form-input" id="fb-projectId" placeholder="projekt-id" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Storage Bucket</label>
-                        <input type="text" class="form-input" id="fb-storageBucket" placeholder="projekt-id.appspot.com" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Messaging Sender ID</label>
-                        <input type="text" class="form-input" id="fb-messagingSenderId" placeholder="1234567890" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">App ID</label>
-                        <input type="text" class="form-input" id="fb-appId" placeholder="1:12345:web:abcde" required>
-                    </div>
+                </div>
 
-                    <button type="submit" class="btn-primary-form" style="margin-top: 20px;">Uložit a připojit</button>
-                </form>
+                <!-- App Version -->
+                <div class="glass-card" style="margin-bottom: 16px; padding: 16px;">
+                    <h4 style="font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px;">O aplikaci</h4>
+                    <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.5;">
+                        Verze systému: <strong style="color: var(--text-primary);">v1.5.0 (cache v7)</strong><br>
+                        Platforma: <strong style="color: var(--text-primary);">Web App PWA</strong>
+                    </div>
+                    <button type="button" class="btn-primary-form" onclick="forceAppUpdate()" style="margin: 8px 0 0 0; width: 100%; font-size: 11px; padding: 8px; background: rgba(99, 102, 241, 0.15); color: var(--accent-indigo); border: 1px solid rgba(99, 102, 241, 0.2);">
+                        🔄 Vynutit aktualizaci systému
+                    </button>
+                </div>
 
                 <!-- Account Security Section -->
-                <div class="glass-card" style="margin-top: 24px; padding: 16px; border-color: rgba(239, 68, 68, 0.2);">
+                <div class="glass-card" style="padding: 16px; border-color: rgba(239, 68, 68, 0.2);">
                     <h4 style="font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px;">Zabezpečení účtu</h4>
                     <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 12px;" id="logged-in-user-text">Přihlášen jako: ...</p>
                     <button type="button" class="btn-primary-form" onclick="handleLogout()" style="margin: 0; width: 100%; font-size: 12px; padding: 10px; background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);">
