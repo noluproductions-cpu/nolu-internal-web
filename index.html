@@ -270,25 +270,8 @@
                         <input type="text" class="form-input" id="fb-appId" placeholder="1:12345:web:abcde" required>
                     </div>
 
-                    <div style="display: flex; gap: 12px; margin-top: 20px;">
-                        <button type="submit" class="btn-primary-form" style="margin: 0; flex: 1;">Připojit a synchronizovat</button>
-                        <button type="button" class="btn-primary-form" onclick="clearFirebaseConfig()" style="margin: 0; background: rgba(239, 68, 68, 0.2); color: #ef4444; flex: 1;">Odpojit / Reset</button>
-                    </div>
+                    <button type="submit" class="btn-primary-form" style="margin-top: 20px;">Uložit a připojit</button>
                 </form>
-
-                <!-- Data Migration tools -->
-                <div id="migration-box" class="glass-card" style="margin-top: 20px; display: none; padding: 16px;">
-                    <h4 style="font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 6px;">Nahrání místních dat do cloudu</h4>
-                    <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.4;">
-                        Máte v telefonu/počítači uložená lokální data? Můžete je nahrát do nové Firebase databáze, aby je viděli i ostatní.
-                    </p>
-                    <button type="button" class="btn-primary-form" onclick="migrateLocalDataToFirebase()" style="margin: 0; width: 100%; font-size: 12px; padding: 10px; background: rgba(99, 102, 241, 0.2); color: var(--accent-indigo);">
-                        📤 Nahrát místní data do Firebase
-                    </button>
-                    <button type="button" class="btn-primary-form" onclick="initializeFirebaseWithMockData()" style="margin: 10px 0 0 0; width: 100%; font-size: 12px; padding: 10px; background: rgba(168, 85, 247, 0.2); color: var(--accent-purple);">
-                        ✨ Inicializovat Firebase ukázkovými daty
-                    </button>
-                </div>
             </div>
         </div>
     </div>
