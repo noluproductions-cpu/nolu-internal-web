@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    
+    <!-- PWA Settings -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="NOLU Studio">
+    <link rel="apple-touch-icon" href="logo.png">
+    <link rel="manifest" href="manifest.json">
+    
+    <title>NOLU Studio | Interní systém</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- CSS stylesheet -->
+    <link rel="stylesheet" href="css/style.css">
+    
+    <!-- JS script (loaded with defer) -->
+    <script src="js/app.js" defer></script>
+</head>
+<body>
+
+    <!-- Ambient Glow Backgrounds -->
+    <div class="ambient-bg">
+        <div class="glow-sphere glow-1"></div>
+        <div class="glow-sphere glow-2"></div>
+    </div>
+
+    <!-- MARK: - 1. DASHBOARD SCREEN -->
+    <div id="screen-dashboard" class="screen active">
+        <div class="screen-header">
+            <div class="screen-title-group">
+                <span class="screen-subtitle">NOLU Productions</span>
+                <h1>Nástěnka</h1>
+            </div>
+            <div class="status-pill">
+                <span class="status-dot"></span>
+                <span>Interní režim</span>
+            </div>
+        </div>
+        
+        <!-- Metrics Card -->
+        <div class="glass-card metrics-card">
+            <div class="metrics-title">Hospodárení studia (Tento měsíc)</div>
+            <div class="metrics-row">
+                <div class="profit-value positive" id="dash-profit">0 Kč</div>
+                <div class="metrics-sub">
+                    Příjmy: <span class="colored-green" id="dash-income">+0 Kč</span><br>
+                    Výdaje: <span class="colored-red" id="dash-expense">-0 Kč</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Counters -->
+        <div class="counters-row">
+            <div class="glass-card counter-card">
+                <span class="counter-icon">📁</span>
+                <span class="counter-label">Aktivní projekty</span>
+                <span class="counter-val" id="count-projects">0</span>
+            </div>
+            <div class="glass-card counter-card">
+                <span class="counter-icon">👥</span>
+                <span class="counter-label">Aktivní klienti</span>
+                <span class="counter-val" id="count-clients">0</span>
+            </div>
+        </div>
+        
+        <!-- Agenda Section -->
+        <div class="section-title-bar">
+            <h3>Blížící se program</h3>
+            <button class="btn-round-add" onclick="openSheet('sheet-add-event')">+</button>
+        </div>
+        <div class="agenda-list" id="dash-agenda" style="margin-bottom: 24px;">
+            <!-- Dynamic events will render here -->
+        </div>
+
+        <!-- Active Projects Section -->
+        <div class="section-title-bar">
+            <h3>Rozpracované zakázky</h3>
+        </div>
+        <div class="agenda-list" id="dash-projects-list">
+            <!-- Dynamic active projects will render here -->
+        </div>
+    </div>
+
+    <!-- MARK: - 2. PROJECTS SCREEN -->
+    <div id="screen-projects" class="screen">
+        <div class="screen-header">
+            <div class="screen-title-group">
+                <span class="screen-subtitle">Výroba obsahu</span>
+                <h1>Projekty</h1>
+            </div>
+            <button class="btn-round-add" onclick="openSheet('sheet-add-project')">+</button>
+        </div>
+        
+        <!-- Segment Control -->
+        <div class="segment-control" id="project-segment-control">
+            <!-- Dynamic project status filters -->
+        </div>
+        
+        <div id="projects-list-container">
+            <!-- Dynamic projects list -->
+        </div>
+    </div>
+
+    <!-- MARK: - 3. CLIENTS SCREEN -->
+    <div id="screen-clients" class="screen">
+        <div class="screen-header">
+            <div class="screen-title-group">
+                <span class="screen-subtitle">CRM systém</span>
+                <h1>Klienti</h1>
+            </div>
+            <button class="btn-round-add" onclick="openSheet('sheet-add-client')">+</button>
+        </div>
+        
+        <!-- Search bar -->
+        <div class="search-container">
+            <span class="search-icon">🔍</span>
+            <input type="text" class="search-input" id="client-search" placeholder="Hledat klienta nebo firmu...">
+        </div>
+        
+        <div id="clients-list-container">
+            <!-- Dynamic clients list -->
+        </div>
+    </div>
+
+    <!-- MARK: - 4. FINANCES SCREEN -->
+    <div id="screen-finances" class="screen">
+        <div class="screen-header">
+            <div class="screen-title-group">
+                <span class="screen-subtitle">Sledování zisku</span>
+                <h1>Finance</h1>
+            </div>
+            <button class="btn-round-add" onclick="openSheet('sheet-add-transaction')">+</button>
+        </div>
+        
+        <!-- Financial Balance Card -->
+        <div class="glass-card metrics-card" style="text-align: center;">
+            <div class="metrics-title">Celková bilance (čistý zisk)</div>
+            <div class="profit-value positive" id="finance-net" style="font-size: 34px; margin: 4px 0 8px 0;">0 Kč</div>
+            <div style="font-size: 11px; color: var(--text-secondary); display: flex; justify-content: center; gap: 16px;">
+                <span>🟢 Příjmy: <b id="finance-income">+0 Kč</b></span>
+                <span>🔴 Výdaje: <b id="finance-expense">-0 Kč</b></span>
+            </div>
+        </div>
+
+        <!-- Custom Visual CSS Chart -->
+        <div class="glass-card">
+            <div class="metrics-title">Přehled podle kategorií</div>
+            <div class="chart-container" id="finance-chart">
+                <!-- Dynamic chart bars will render here -->
+            </div>
+        </div>
+
+        <!-- Segment filter for Transactions -->
+        <div class="segment-control">
+            <button class="segment-btn active" onclick="filterTransactions(0, this)">Vše</button>
+            <button class="segment-btn" onclick="filterTransactions(1, this)">Příjmy</button>
+            <button class="segment-btn" onclick="filterTransactions(2, this)">Výdaje</button>
+        </div>
+
+        <!-- Transactions Ledger -->
+        <div class="ledger-list" id="ledger-list-container">
+            <!-- Dynamic transaction list items -->
+        </div>
+    </div>
+
+    <!-- MARK: - 5. IDEAS SCREEN -->
+    <div id="screen-ideas" class="screen">
+        <div class="screen-header">
+            <div class="screen-title-group">
+                <span class="screen-subtitle">Kreativní nápady</span>
+                <h1>Scénáře</h1>
+            </div>
+            <button class="btn-round-add" onclick="openSheet('sheet-add-idea')">+</button>
+        </div>
+        
+        <div id="ideas-list-container">
+            <!-- Dynamic ideas list -->
+        </div>
+    </div>
+
+    <!-- MARK: - BOTTOM TAB BAR -->
+    <nav class="bottom-nav">
+        <button class="nav-tab active" onclick="switchTab(0, this)">
+            <span class="nav-tab-icon">📊</span>
+            <span>Nástěnka</span>
+        </button>
+        <button class="nav-tab" onclick="switchTab(1, this)">
+            <span class="nav-tab-icon">📁</span>
+            <span>Projekty</span>
+        </button>
+        <button class="nav-tab" onclick="switchTab(2, this)">
+            <span class="nav-tab-icon">👥</span>
+            <span>Klienti</span>
+        </button>
+        <button class="nav-tab" onclick="switchTab(3, this)">
+            <span class="nav-tab-icon">💰</span>
+            <span>Finance</span>
+        </button>
+        <button class="nav-tab" onclick="switchTab(4, this)">
+            <span class="nav-tab-icon">💡</span>
+            <span>Scénáře</span>
+        </button>
+    </nav>
+
+    <!-- MARK: - MODAL SHEETS (SLIDING FROM BOTTOM) -->
+    
+    <!-- Sheet: Add Client -->
+    <div class="modal-sheet-overlay" id="sheet-add-client">
+        <div class="modal-sheet">
+            <div class="modal-sheet-drag-handle"></div>
+            <div class="modal-sheet-header">
+                <span class="modal-sheet-title">Nový klient</span>
+                <button class="modal-sheet-close-btn" onclick="closeSheet('sheet-add-client')">Zrušit</button>
+            </div>
+            <div class="modal-sheet-content">
+                <form id="form-add-client" onsubmit="saveClient(event)">
+                    <div class="form-group">
+                        <label class="form-label">Jméno zástupce</label>
+                        <input type="text" class="form-input" id="client-name" placeholder="Např. Jan Novák" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Název firmy / Značky</label>
+                        <input type="text" class="form-input" id="client-company" placeholder="Např. Kavárna Plzeň" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Stav spolupráce</label>
+                        <select class="form-input form-select" id="client-status">
+                            <option value="lead">Potenciální</option>
+                            <option value="active" selected>Aktivní</option>
+                            <option value="completed">Dokončený</option>
+                            <option value="inactive">Neaktivní</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">E-mail</label>
+                        <input type="email" class="form-input" id="client-email" placeholder="novak@firma.cz" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Telefon</label>
+                        <input type="tel" class="form-input" id="client-phone" placeholder="+420 123 456 789" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Interní poznámka</label>
+                        <textarea class="form-input" id="client-notes" placeholder="Popište detaily spolupráce..."></textarea>
+                    </div>
+                    <button type="submit" class="btn-primary-form">Uložit klienta</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sheet: Add Project -->
+    <div class="modal-sheet-overlay" id="sheet-add-project">
+        <div class="modal-sheet">
+            <div class="modal-sheet-drag-handle"></div>
+            <div class="modal-sheet-header">
+                <span class="modal-sheet-title">Nová zakázka</span>
+                <button class="modal-sheet-close-btn" onclick="closeSheet('sheet-add-project')">Zrušit</button>
+            </div>
+            <div class="modal-sheet-content">
+                <form id="form-add-project" onsubmit="saveProject(event)">
+                    <div class="form-group">
+                        <label class="form-label">Název projektu / Zakázky</label>
+                        <input type="text" class="form-input" id="project-title" placeholder="Např. Promo video podzim" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Jméno klienta / Firma</label>
+                        <input type="text" class="form-input" id="project-client" placeholder="Vyberte nebo napište firmu" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Kategorie</label>
+                        <select class="form-input form-select" id="project-tag">
+                            <option value="Video">Video produkce</option>
+                            <option value="Foto">Fotografie</option>
+                            <option value="Social Media">Social Media</option>
+                            <option value="Branding">Branding</option>
+                            <option value="Web">Web design</option>
+                            <option value="Ostatní">Ostatní</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Fáze realizace</label>
+                        <select class="form-input form-select" id="project-status">
+                            <option value="idea">Nápad</option>
+                            <option value="preProduction" selected>Předprodukce</option>
+                            <option value="shooting">Natáčení</option>
+                            <option value="editing">Střih</option>
+                            <option value="delivered">Odevzdáno</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Rozpočet (v Kč)</label>
+                        <input type="number" class="form-input" id="project-budget" placeholder="Zadejte částku" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Termín odevzdání</label>
+                        <input type="date" class="form-input" id="project-deadline" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Naše role v projektu</label>
+                        <input type="text" class="form-input" id="project-role" placeholder="Např. Režie, kamera a střih" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Popis zakázky</label>
+                        <textarea class="form-input" id="project-desc" placeholder="Popište specifikaci projektu..."></textarea>
+                    </div>
+                    <button type="submit" class="btn-primary-form">Uložit zakázku</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sheet: Add Transaction -->
+    <div class="modal-sheet-overlay" id="sheet-add-transaction">
+        <div class="modal-sheet">
+            <div class="modal-sheet-drag-handle"></div>
+            <div class="modal-sheet-header">
+                <span class="modal-sheet-title">Nová transakce</span>
+                <button class="modal-sheet-close-btn" onclick="closeSheet('sheet-add-transaction')">Zrušit</button>
+            </div>
+            <div class="modal-sheet-content">
+                <form id="form-add-transaction" onsubmit="saveTransaction(event)">
+                    <div class="form-group">
+                        <label class="form-label">Název transakce</label>
+                        <input type="text" class="form-input" id="tx-title" placeholder="Např. Záloha za video" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Částka (v Kč)</label>
+                        <input type="number" class="form-input" id="tx-amount" placeholder="Např. 15000" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Typ transakce</label>
+                        <select class="form-input form-select" id="tx-type" onchange="toggleTxCategories()">
+                            <option value="income">Příjem (+)</option>
+                            <option value="expense">Výdaj (-)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Kategorie</label>
+                        <select class="form-input form-select" id="tx-category">
+                            <!-- Populated dynamically based on type -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Datum</label>
+                        <input type="date" class="form-input" id="tx-date" required>
+                    </div>
+                    <button type="submit" class="btn-primary-form">Uložit transakce</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sheet: Add Event -->
+    <div class="modal-sheet-overlay" id="sheet-add-event">
+        <div class="modal-sheet">
+            <div class="modal-sheet-drag-handle"></div>
+            <div class="modal-sheet-header">
+                <span class="modal-sheet-title">Nová událost</span>
+                <button class="modal-sheet-close-btn" onclick="closeSheet('sheet-add-event')">Zrušit</button>
+            </div>
+            <div class="modal-sheet-content">
+                <form id="form-add-event" onsubmit="saveEvent(event)">
+                    <div class="form-group">
+                        <label class="form-label">Název události</label>
+                        <input type="text" class="form-input" id="event-title" placeholder="Např. Natáčení Plzeň" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Typ události</label>
+                        <select class="form-input form-select" id="event-type">
+                            <option value="shooting">Natáčení 🎥</option>
+                            <option value="meeting">Schůzka 🤝</option>
+                            <option value="deadline">Uzávěrka ⏰</option>
+                            <option value="other">Ostatní 📌</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Datum a čas</label>
+                        <input type="datetime-local" class="form-input" id="event-date" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Doba trvání (v hodinách)</label>
+                        <input type="number" step="0.5" class="form-input" id="event-duration" value="2" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Místo konání</label>
+                        <input type="text" class="form-input" id="event-location" placeholder="Ateliér, Kavárna atd." required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Poznámka</label>
+                        <textarea class="form-input" id="event-notes" placeholder="Podrobnosti..."></textarea>
+                    </div>
+                    <button type="submit" class="btn-primary-form">Uložit událost</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sheet: Add Idea -->
+    <div class="modal-sheet-overlay" id="sheet-add-idea">
+        <div class="modal-sheet">
+            <div class="modal-sheet-drag-handle"></div>
+            <div class="modal-sheet-header">
+                <span class="modal-sheet-title">Nový nápad / Scénář</span>
+                <button class="modal-sheet-close-btn" onclick="closeSheet('sheet-add-idea')">Zrušit</button>
+            </div>
+            <div class="modal-sheet-content">
+                <form id="form-add-idea" onsubmit="saveIdea(event)">
+                    <div class="form-group">
+                        <label class="form-label">Název nápadu / Téma</label>
+                        <input type="text" class="form-input" id="idea-title" placeholder="Např. Trend: Jak točíme na mobil" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Kategorie</label>
+                        <select class="form-input form-select" id="idea-category">
+                            <option value="reels">Reels / TikTok</option>
+                            <option value="campaign">Kampaň</option>
+                            <option value="branding">Branding</option>
+                            <option value="other">Ostatní</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Temp Hooks Builder -->
+                    <div class="form-group">
+                        <label class="form-label">Hooky / Háčky (první 3 sekundy)</label>
+                        <div class="dynamic-hook-input-row">
+                            <input type="text" class="form-input" id="idea-hook-input" placeholder="Zadejte větu...">
+                            <button type="button" class="btn-icon-add" onclick="addHookToList()">+</button>
+                        </div>
+                        <div class="added-hooks-temp-list" id="idea-hooks-temp-container">
+                            <!-- Added hooks will show here -->
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label class="form-label">Scénář / Poznámka</label>
+                        <textarea class="form-input" id="idea-script" placeholder="Napište osnovu, mluvené slovo nebo scénář..."></textarea>
+                    </div>
+                    <button type="submit" class="btn-primary-form">Uložit nápad</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sheet: CLIENT DETAIL -->
+    <div class="modal-sheet-overlay" id="sheet-client-detail">
+        <div class="modal-sheet">
+            <div class="modal-sheet-drag-handle"></div>
+            <div class="modal-sheet-header">
+                <span class="modal-sheet-title" id="detail-client-company">Název firmy</span>
+                <button class="modal-sheet-close-btn" onclick="closeSheet('sheet-client-detail')">Zavřít</button>
+            </div>
+            <div class="modal-sheet-content" id="detail-client-body">
+                <!-- Rendered dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Sheet: PROJECT DETAIL -->
+    <div class="modal-sheet-overlay" id="sheet-project-detail">
+        <div class="modal-sheet">
+            <div class="modal-sheet-drag-handle"></div>
+            <div class="modal-sheet-header">
+                <span class="modal-sheet-title" id="detail-project-title">Název projektu</span>
+                <button class="modal-sheet-close-btn" onclick="closeSheet('sheet-project-detail')">Zavřít</button>
+            </div>
+            <div class="modal-sheet-content" id="detail-project-body">
+                <!-- Rendered dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Sheet: IDEA DETAIL -->
+    <div class="modal-sheet-overlay" id="sheet-idea-detail">
+        <div class="modal-sheet">
+            <div class="modal-sheet-drag-handle"></div>
+            <div class="modal-sheet-header">
+                <span class="modal-sheet-title" id="detail-idea-title">Název nápadu</span>
+                <button class="modal-sheet-close-btn" onclick="closeSheet('sheet-idea-detail')">Zavřít</button>
+            </div>
+            <div class="modal-sheet-content" id="detail-idea-body">
+                <!-- Rendered dynamically -->
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>
