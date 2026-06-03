@@ -129,11 +129,11 @@ function loadFirebaseConfigFromLocalStorage() {
     
     // Výchozí hardkódovaná konfigurace od uživatele
     firebaseConfig = {
-        apiKey: "AIzaSyCLfOEBdoUspaQCJMhhq7FbYuYVS8PC8Ec",
+        apiKey: "AIzaSyCLfoEbdoUspaQCJMhhq7FbYuYVS8PC8Ec",
         authDomain: "nolu-studio.firebaseapp.com",
         projectId: "nolu-studio",
         storageBucket: "nolu-studio.firebasestorage.app",
-        messagingSenderId: "774167298566",
+        messagingSenderId: "741672985666",
         appId: "1:741672985666:web:ab05cd38cffa75deb0b9db",
         measurementId: "G-TMRV632TQ8"
     };
